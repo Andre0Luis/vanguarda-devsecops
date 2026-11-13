@@ -30,3 +30,4 @@
 90023	FAIL	XML External Entity Attack
 90024	FAIL	Generic Padding Oracle
 90037	FAIL	Remote OS Command Injection (Time Based)
+10106	IGNORE	HTTP Only Site (somente no HML simulado em localhost; API Gateway real aceita apenas HTTPS) - decidido na retro Sprint 1
