@@ -1,0 +1,47 @@
+# =============================================================================
+# Projeto Vanguarda - .gitignore raiz
+# Regra de ouro: nenhum segredo, artefato de build ou relatório de scan no Git.
+# =============================================================================
+
+# Dependências
+node_modules/
+
+# Build / artefatos
+dist/
+dist-export/
+build/
+*.tsbuildinfo
+coverage/
+.serverless/
+.expo/
+.expo-shared/
+web-build/
+
+# Segredos e configuração local (somente o .env.example é versionado)
+*.env
+.env*
+!.env.example
+*.pem
+*.p8
+*.p12
+*.key
+*.keystore
+!debug.keystore
+google-services.json
+GoogleService-Info.plist
+
+# Relatórios de scanners (ZAP, Nuclei, Semgrep, Checkov, TruffleHog) — vão como artefato do pipeline
+reports/
+security/zap/out/
+security/nuclei/out/
+*.sarif
+
+# Logs e lixo de SO/IDE
+npm-debug.log*
+yarn-error.log*
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json

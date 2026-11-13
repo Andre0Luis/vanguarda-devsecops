@@ -1,0 +1,23 @@
+id: vanguarda-mass-assignment
+
+info:
+  name: Vanguarda - Mass assignment / campos nao permitidos aceitos
+  author: squad-vanguarda
+  severity: high
+  description: |
+    Tenta injetar campos extras (isAdmin, plan, score) no corpo da requisicao.
+    A API deve rejeitar com 400 (ValidationPipe whitelist + forbidNonWhitelisted).
+    OWASP API3:2023 - Broken Object Property Level Authorization.
+  tags: vanguarda,api,mass-assignment
+
+http:
+  - method: POST
+    path:
+      - "{{BaseURL}}/v1/risk/url"
+    headers:
+      Content-Type: application/json
+    body: '{"url":"https://exemplo.com.br","isAdmin":true,"plan":"PREMIUM","score":0}'
+    matchers:
+      - type: status
+        status:
+          - 200

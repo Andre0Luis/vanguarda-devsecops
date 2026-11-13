@@ -1,0 +1,3 @@
+#!/usr/bin/env sh
+# Valida a mensagem de commit no padrão Conventional Commits (commitlint.config.js).
+npx --no -- commitlint --edit "$1"

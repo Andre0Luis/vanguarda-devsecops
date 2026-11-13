@@ -1,0 +1,123 @@
+# =============================================================================
+# Regras Semgrep customizadas do Projeto Vanguarda
+# Nascem nas Sprint Retrospectives (Purple Team): cada achado de Red Team que
+# escapou do SAST vira uma regra aqui, para nunca mais regredir.
+# =============================================================================
+rules:
+  - id: vanguarda-pii-in-logs
+    message: >-
+      Possível dado pessoal (CPF, telefone, chave Pix, texto de SMS) sendo logado.
+      Use securityEvent() com allowlist de campos (LGPD - minimização).
+    severity: ERROR
+    languages: [typescript, javascript]
+    metadata:
+      category: security
+      owasp: "A09:2021 - Security Logging and Monitoring Failures"
+      cwe: "CWE-532: Insertion of Sensitive Information into Log File"
+      origem: "Purple Team - Sprint 2"
+    patterns:
+      - pattern-either:
+          - pattern: console.$LOG(..., $X, ...)
+          - pattern: $LOGGER.log(..., $X, ...)
+          - pattern: $LOGGER.info(..., $X, ...)
+          - pattern: $LOGGER.debug(..., $X, ...)
+          - pattern: $LOGGER.warn(..., $X, ...)
+          - pattern: $LOGGER.error(..., $X, ...)
+      - metavariable-regex:
+          metavariable: $X
+          regex: (?i).*(cpf|cnpj|phone|telefone|pixKey|chavePix|smsText|password|senha|token).*
+
+  - id: vanguarda-no-outbound-request-to-analyzed-url
+    message: >-
+      O motor de risco não pode acessar a URL analisada (SSRF e confirmação de
+      vítima ativa para o golpista). Use o adapter de reputação assíncrono.
+    severity: ERROR
+    languages: [typescript]
+    metadata:
+      category: security
+      owasp: "A10:2021 - Server-Side Request Forgery"
+      cwe: "CWE-918: Server-Side Request Forgery (SSRF)"
+    paths:
+      include:
+        - "**/src/risk/**"
+    pattern-either:
+      - pattern: fetch(...)
+      - pattern: axios.$METHOD(...)
+      - pattern: axios(...)
+      - pattern: http.get(...)
+      - pattern: https.get(...)
+      - pattern: http.request(...)
+      - pattern: https.request(...)
+
+  - id: vanguarda-validation-pipe-without-whitelist
+    message: ValidationPipe deve usar whitelist e forbidNonWhitelisted (mass assignment).
+    severity: ERROR
+    languages: [typescript]
+    metadata:
+      category: security
+      owasp: "API3:2023 - Broken Object Property Level Authorization"
+    patterns:
+      - pattern: new ValidationPipe($OPTS)
+      - pattern-not: |
+          new ValidationPipe({..., whitelist: true, ..., forbidNonWhitelisted: true, ...})
+
+  - id: vanguarda-permissive-cors
+    message: CORS aberto. O app mobile não precisa de CORS; mantenha origin false.
+    severity: ERROR
+    languages: [typescript]
+    metadata:
+      category: security
+      cwe: "CWE-942: Permissive Cross-domain Policy"
+    pattern-either:
+      - pattern: $APP.enableCors()
+      - pattern: '$APP.enableCors({..., origin: true, ...})'
+      - pattern: "$APP.enableCors({..., origin: '*', ...})"
+
+  - id: vanguarda-jwt-decode-without-verify
+    message: jwt.decode() não valida assinatura. Use jwt.verify() com algoritmo fixo.
+    severity: ERROR
+    languages: [typescript, javascript]
+    metadata:
+      category: security
+      cwe: "CWE-347: Improper Verification of Cryptographic Signature"
+    pattern: jwt.decode(...)
+
+  - id: vanguarda-mobile-token-in-asyncstorage
+    message: >-
+      Tokens/segredos não podem ir para o AsyncStorage (texto puro). Use
+      expo-secure-store (Keychain/Keystore).
+    severity: ERROR
+    languages: [typescript]
+    metadata:
+      category: security
+      owasp: "M9:2024 - Insecure Data Storage"
+    patterns:
+      - pattern: AsyncStorage.setItem($KEY, ...)
+      - metavariable-regex:
+          metavariable: $KEY
+          regex: (?i).*(token|secret|senha|password|session|jwt).*
+
+  - id: vanguarda-mobile-webview-open-origin
+    message: WebView com originWhitelist aberto permite carregar qualquer site (phishing dentro do app).
+    severity: ERROR
+    languages: [typescript]
+    metadata:
+      category: security
+      owasp: "M4:2024 - Insufficient Input/Output Validation"
+    pattern: "<WebView ... originWhitelist={['*']} ... />"
+
+  - id: vanguarda-http-cleartext-endpoint
+    message: Endpoint em HTTP puro. Toda comunicação do app deve ser HTTPS (ATS / cleartext off).
+    severity: WARNING
+    languages: [typescript]
+    metadata:
+      category: security
+      owasp: "M5:2024 - Insecure Communication"
+    paths:
+      include:
+        - "**/apps/mobile/src/**"
+    patterns:
+      - pattern: '"$URL"'
+      - metavariable-regex:
+          metavariable: $URL
+          regex: ^http://(?!localhost|127\.0\.0\.1|10\.0\.2\.2).*

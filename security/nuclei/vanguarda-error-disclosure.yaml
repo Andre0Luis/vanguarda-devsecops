@@ -1,0 +1,36 @@
+id: vanguarda-error-disclosure
+
+info:
+  name: Vanguarda - Vazamento de stack trace / detalhes internos
+  author: squad-vanguarda
+  severity: high
+  description: |
+    Envia JSON malformado e payloads inesperados para as rotas do motor de risco e verifica
+    se a resposta vaza stack trace, nomes de arquivos, classes internas ou mensagens do framework.
+    Origem: Purple Team Sprint 1 (OWASP API8:2023 - Security Misconfiguration).
+  tags: vanguarda,misconfig,exposure,api
+
+http:
+  - raw:
+      - |
+        POST /v1/risk/url HTTP/1.1
+        Host: {{Hostname}}
+        Content-Type: application/json
+
+        {"url": 
+      - |
+        POST /v1/risk/pix HTTP/1.1
+        Host: {{Hostname}}
+        Content-Type: application/json
+
+        {"keyType":"CPF","amountInCents":"NaN","__proto__":{"admin":true}}
+    matchers-condition: or
+    matchers:
+      - type: regex
+        part: body
+        regex:
+          - "at [A-Za-z0-9_.<>]+ \\(.*:\\d+:\\d+\\)"
+          - "node_modules/"
+          - "SyntaxError: Unexpected"
+          - "TypeError:"
+          - "QueryFailedError"

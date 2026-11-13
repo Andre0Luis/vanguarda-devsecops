@@ -1,0 +1,6 @@
+# Áreas de risco exigem revisão do Tech Lead / Platform Engineer (regra de Code Review por risco)
+*                                   @Andre0Luis
+/services/api/src/risk/             @Andre0Luis
+/services/api/serverless.yml        @Andre0Luis
+/.github/workflows/                 @Andre0Luis
+/security/                          @Andre0Luis

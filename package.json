@@ -1,0 +1,23 @@
+{
+  "name": "vanguarda-devsecops",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Projeto Vanguarda - monorepo de referência DevSecOps (app mobile + API serverless do motor de risco antigolpes)",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22.22.1"
+  },
+  "scripts": {
+    "prepare": "husky",
+    "secrets:scan": "git secrets --scan",
+    "secrets:setup": "bash scripts/setup-git-secrets.sh",
+    "lint-staged": "lint-staged"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^21.2.4",
+    "@commitlint/config-conventional": "^21.2.4",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.6.0",
+    "yaml": "^2.9.1"
+  }
+}

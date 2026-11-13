@@ -1,0 +1,38 @@
+id: vanguarda-missing-security-headers
+
+info:
+  name: Vanguarda - Cabecalhos de seguranca obrigatorios ausentes
+  author: squad-vanguarda
+  severity: medium
+  description: Garante HSTS, nosniff e CSP restritiva em todas as respostas da API.
+  tags: vanguarda,headers,misconfig
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/health"
+    matchers-condition: or
+    matchers:
+      - type: word
+        part: header
+        words:
+          - "strict-transport-security"
+        negative: true
+        case-insensitive: true
+      - type: word
+        part: header
+        words:
+          - "x-content-type-options: nosniff"
+        negative: true
+        case-insensitive: true
+      - type: word
+        part: header
+        words:
+          - "content-security-policy"
+        negative: true
+        case-insensitive: true
+      - type: word
+        part: header
+        words:
+          - "x-powered-by"
+        case-insensitive: true

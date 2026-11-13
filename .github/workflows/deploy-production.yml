@@ -1,0 +1,44 @@
+# =============================================================================
+# Projeto Vanguarda - Promoção para Produção · MODO SIMULADO
+# Só promove o que já passou pelo pipeline em HML. Exige aprovação manual
+# no GitHub Environment "production" (required reviewers).
+# =============================================================================
+name: Deploy Produção
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Tag/versão a promover (ex. v1.2.0)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy-prd:
+    name: 🚀 Deploy PRD (aprovação manual)
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://api.vanguarda.app
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy (simulado)
+        run: |
+          echo "▶ aws-actions/configure-aws-credentials@v4 (OIDC, role vanguarda-github-deployer-prd)"
+          echo "▶ npx serverless deploy --stage prd  (versão ${{ inputs.version }})"
+          echo "▶ Lambda alias 'live' com deploy gradual (canary 10% → 100%)"
+      - name: Smoke test + rollback automático (simulado)
+        run: |
+          echo "▶ curl -fsS https://api.vanguarda.app/health"
+          echo "  se falhar → npx serverless rollback --stage prd --timestamp <anterior>"
+      - run: echo "### 🚀 Produção atualizada para ${{ inputs.version }} (simulado)" >> "$GITHUB_STEP_SUMMARY"

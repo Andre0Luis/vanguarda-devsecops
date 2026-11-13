@@ -1,0 +1,32 @@
+# OWASP ZAP - politica de alertas do Projeto Vanguarda (formato: ID<TAB>ACAO<TAB>descricao)
+# FAIL = quebra o pipeline | WARN = reporta | IGNORE = falso positivo aceito em retro (Purple Team)
+10010	WARN	Cookie No HttpOnly Flag
+10011	WARN	Cookie Without Secure Flag
+10020	IGNORE	Anti-clickjacking Header (API JSON sem UI - CSP frame-ancestors none ja aplicado)
+10021	FAIL	X-Content-Type-Options Header Missing
+10023	FAIL	Information Disclosure - Debug Error Messages
+10035	FAIL	Strict-Transport-Security Header Not Set
+10036	WARN	Server Leaks Version Information via Server HTTP Response Header
+10037	FAIL	Server Leaks Information via X-Powered-By
+10038	FAIL	Content Security Policy (CSP) Header Not Set
+10049	IGNORE	Storable and Cacheable Content (respostas de risco nao sao sensiveis a cache intermediario no MVP)
+10098	FAIL	Cross-Domain Misconfiguration
+40012	FAIL	Cross Site Scripting (Reflected)
+40014	FAIL	Cross Site Scripting (Persistent)
+40018	FAIL	SQL Injection
+40019	FAIL	SQL Injection - MySQL
+40020	FAIL	SQL Injection - Hypersonic SQL
+40021	FAIL	SQL Injection - Oracle
+40022	FAIL	SQL Injection - PostgreSQL
+40024	FAIL	SQL Injection - SQLite
+40027	FAIL	SQL Injection - MsSQL
+40042	FAIL	Spring Actuator Information Leak
+40046	FAIL	Server Side Request Forgery
+90017	FAIL	XSLT Injection
+90019	FAIL	Server Side Code Injection
+90020	FAIL	Remote OS Command Injection
+90021	FAIL	XPath Injection
+90022	FAIL	Application Error Disclosure
+90023	FAIL	XML External Entity Attack
+90024	FAIL	Generic Padding Oracle
+90037	FAIL	Remote OS Command Injection (Time Based)

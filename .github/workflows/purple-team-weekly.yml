@@ -1,0 +1,58 @@
+# =============================================================================
+# Projeto Vanguarda - Purple Team semanal
+# Varredura mais profunda que a do pipeline (ZAP com regras alfa). O resultado
+# vira pauta da Sprint Retrospective: ajustar regras Semgrep, limiares do
+# CloudWatch e criar novos templates Nuclei.
+# =============================================================================
+name: Purple Team (semanal)
+
+on:
+  schedule:
+    - cron: '0 9 * * 1' # segunda-feira 06:00 (America/Sao_Paulo)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deep-scan:
+    name: 🟣 Varredura profunda + métricas
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: services/api/package-lock.json
+      - name: Sobe a API (ambiente de teste)
+        working-directory: services/api
+        env:
+          STAGE: hml
+          RATE_LIMIT_PER_MIN: '100000'
+          PIX_RATE_LIMIT_PER_MIN: '100000'
+        run: |
+          npm ci && npm run build
+          nohup node dist/main.js > api.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://localhost:3000/health && break; sleep 1; done
+      - name: ZAP API Scan completo (inclui regras alfa)
+        run: |
+          mkdir -p reports && chmod 777 reports && cp security/zap/rules.tsv reports/
+          docker run --rm --network host -v "$PWD/reports:/zap/wrk:rw" ghcr.io/zaproxy/zaproxy:stable \
+            zap-api-scan.py -t http://localhost:3000/docs-json -f openapi -a -c rules.tsv -I \
+            -r purple-zap.html -J purple-zap.json -w purple-zap.md || true
+      - name: Pauta para a Sprint Retrospective
+        run: |
+          {
+            echo "## 🟣 Purple Team — pauta da retrospectiva"
+            echo "1. Revisar alertas do ZAP abaixo (novos? falsos positivos → \`rules.tsv\`)."
+            echo "2. Algum ataque passou sem alarme no CloudWatch? → ajustar Metric Filter/limiar."
+            echo "3. Achado que o Semgrep não pegou? → nova regra em \`security/semgrep/\`."
+            echo "4. Novo vetor de golpe visto no mercado? → novo template em \`security/nuclei/\`."
+            echo ""
+            cat reports/purple-zap.md 2>/dev/null || true
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: purple-team-report
+          path: reports/

@@ -1,0 +1,18 @@
+# Checkov - política de IaC do Projeto Vanguarda
+# Toda exceção precisa de justificativa e é revisada na Sprint Retrospective (Purple Team).
+compact: true
+quiet: true
+soft-fail: false
+skip-download: true
+skip-path:
+  - node_modules
+  - dist
+skip-check:
+  # Bucket de deploy do Serverless guarda apenas artefatos (zip/template), já privado,
+  # versionado e cifrado. Access logging dobraria o custo de S3 sem ganho real no MVP.
+  # Reavaliar ao ativar CloudTrail data events (pós-MVP).
+  - CKV_AWS_18
+  # workflow_dispatch com input "version" é intencional: a promoção para produção
+  # apenas seleciona uma versão já construída/testada; protegido por Environment
+  # "production" com aprovação manual.
+  - CKV_GHA_7

@@ -1,0 +1,418 @@
+# =============================================================================
+# Projeto Vanguarda - Infraestrutura como Código (Serverless Framework v3)
+# -----------------------------------------------------------------------------
+# - Modelo 100% OPEX: Lambda + API Gateway escalam a zero na ociosidade.
+# - Blue Team "as code": alarmes, detecção de anomalia, Metric Filter de eventos
+#   de segurança, GuardDuty e roteamento de findings para SNS ficam versionados
+#   aqui e passam pelo Checkov (IaC scanning) em todo Pull Request.
+# - Segredos NUNCA ficam neste arquivo: apenas ARNs do Secrets Manager/SSM.
+# =============================================================================
+service: vanguarda-risk-api
+frameworkVersion: '3'
+# nodejs22.x ainda não consta no schema do Framework v3 (só aviso); o runtime é suportado pela AWS.
+configValidationMode: warn
+
+params:
+  default:
+    logRetentionDays: 30
+    rateLimitPerMin: 60
+    apiRateLimit: 50
+    apiBurstLimit: 100
+    reservedConcurrency: 20
+    alarmEmail: seguranca+hml@vanguarda.app
+    # Em um ambiente real estes IDs vêm do SSM Parameter Store:
+    #   ${ssm:/vanguarda/${sls:stage}/network/private-subnet-a}
+    # Aqui usamos valores fictícios para o pipeline conseguir empacotar sem credenciais.
+    subnetA: subnet-0aaaaaaaaaaaaaaa1
+    subnetB: subnet-0bbbbbbbbbbbbbbb2
+    lambdaSg: sg-0ccccccccccccccc3
+    dbSecretArn: arn:aws:secretsmanager:sa-east-1:000000000000:secret:vanguarda/hml/rds-AbCdEf
+    redisEndpoint: vanguarda-hml.xxxxxx.ng.0001.sae1.cache.amazonaws.com:6379
+  hml:
+    rateLimitPerMin: 120
+  prd:
+    logRetentionDays: 365
+    apiRateLimit: 200
+    apiBurstLimit: 400
+    reservedConcurrency: 100
+    alarmEmail: seguranca@vanguarda.app
+    dbSecretArn: arn:aws:secretsmanager:sa-east-1:000000000000:secret:vanguarda/prd/rds-GhIjKl
+    redisEndpoint: vanguarda-prd.xxxxxx.ng.0001.sae1.cache.amazonaws.com:6379
+
+provider:
+  name: aws
+  runtime: nodejs22.x
+  architecture: arm64 # Graviton: ~20% mais barato e mais rápido que x86
+  region: sa-east-1 # Dados no Brasil (LGPD)
+  stage: ${opt:stage, 'dev'}
+  memorySize: 512
+  timeout: 10
+  logRetentionInDays: ${param:logRetentionDays}
+  versionFunctions: true
+  deploymentMethod: direct
+  # Bucket de artefatos do deploy: privado, versionado e cifrado.
+  deploymentBucket:
+    blockPublicAccess: true
+    versioning: true
+    serverSideEncryption: AES256
+  tracing:
+    lambda: true # AWS X-Ray
+  stackTags:
+    project: vanguarda
+    stage: ${sls:stage}
+    owner: squad-vanguarda
+    data-classification: confidential
+  environment:
+    STAGE: ${sls:stage}
+    NODE_OPTIONS: --enable-source-maps
+    RATE_LIMIT_PER_MIN: ${param:rateLimitPerMin}
+    DB_SECRET_ARN: ${param:dbSecretArn}
+    REDIS_ENDPOINT: ${param:redisEndpoint}
+  kmsKeyArn: !GetAtt LambdaEnvKey.Arn # variáveis de ambiente cifradas com CMK
+  vpc:
+    securityGroupIds:
+      - ${param:lambdaSg}
+    subnetIds:
+      - ${param:subnetA}
+      - ${param:subnetB}
+  httpApi:
+    disableDefaultEndpoint: false
+    metrics: true
+  logs:
+    httpApi:
+      format: '{"requestId":"$context.requestId","ip":"$context.identity.sourceIp","route":"$context.routeKey","status":"$context.status","latency":"$context.responseLatency","ua":"$context.identity.userAgent"}'
+  # IAM de menor privilégio: somente o segredo do RDS e a chave KMS do próprio stack.
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - secretsmanager:GetSecretValue
+          Resource: ${param:dbSecretArn}
+        - Effect: Allow
+          Action:
+            - kms:Decrypt
+          Resource: !GetAtt LambdaEnvKey.Arn
+        - Effect: Allow
+          Action:
+            - sqs:SendMessage
+          Resource: !GetAtt RiskApiDlq.Arn
+
+package:
+  individually: false
+  patterns:
+    - '!**'
+    - 'dist/**'
+    - '!dist/**/*.map'
+    - 'node_modules/**'
+    - '!node_modules/**/test/**'
+    - '!node_modules/**/*.md'
+    - '!node_modules/serverless/**'
+    - '!node_modules/typescript/**'
+    - '!node_modules/@types/**'
+
+functions:
+  riskApi:
+    handler: dist/lambda.handler
+    description: Vanguarda - motor de risco (links, SMS, Pix)
+    reservedConcurrency: ${param:reservedConcurrency} # teto de custo + contenção de abuso
+    environment:
+      APP_VERSION: ${env:GITHUB_SHA, 'local'}
+    events:
+      - httpApi:
+          method: GET
+          path: /health
+      - httpApi:
+          method: POST
+          path: /v1/risk/url
+      - httpApi:
+          method: POST
+          path: /v1/risk/sms
+      - httpApi:
+          method: POST
+          path: /v1/risk/pix
+
+resources:
+  # ---------------------------------------------------------------------------
+  # Rate limiting na borda (Blue Team - camada 1): throttling no stage do API GW
+  # ---------------------------------------------------------------------------
+  extensions:
+    # Invocações assíncronas com falha vão para a DLQ cifrada (resiliência + forense).
+    RiskApiLambdaFunction:
+      Properties:
+        DeadLetterConfig:
+          TargetArn: !GetAtt RiskApiDlq.Arn
+    # Logs (podem conter metadados de segurança) cifrados com a CMK do stack.
+    RiskApiLogGroup:
+      Properties:
+        KmsKeyId: !GetAtt LambdaEnvKey.Arn
+    HttpApiLogGroup:
+      Properties:
+        KmsKeyId: !GetAtt LambdaEnvKey.Arn
+    HttpApiStage:
+      Properties:
+        DefaultRouteSettings:
+          ThrottlingRateLimit: ${param:apiRateLimit}
+          ThrottlingBurstLimit: ${param:apiBurstLimit}
+          DetailedMetricsEnabled: true
+
+  Resources:
+    # --- Criptografia -------------------------------------------------------
+    LambdaEnvKey:
+      Type: AWS::KMS::Key
+      Properties:
+        Description: Vanguarda - CMK para variaveis de ambiente, DLQ e SNS
+        EnableKeyRotation: true
+        PendingWindowInDays: 30
+        KeyPolicy:
+          Version: '2012-10-17'
+          Statement:
+            - Sid: RootAccountAdmin
+              Effect: Allow
+              Principal:
+                AWS: !Sub arn:aws:iam::${AWS::AccountId}:root
+              Action: kms:*
+              Resource: '*'
+            - Sid: AllowServicesToUseKey
+              Effect: Allow
+              Principal:
+                Service:
+                  - sns.amazonaws.com
+                  - events.amazonaws.com
+                  - cloudwatch.amazonaws.com
+                  - sqs.amazonaws.com
+                  - !Sub logs.${AWS::Region}.amazonaws.com
+              Action:
+                - kms:Decrypt
+                - kms:Encrypt
+                - kms:ReEncrypt*
+                - kms:DescribeKey
+                - kms:GenerateDataKey*
+              Resource: '*'
+
+    # --- Resiliência ---------------------------------------------------------
+    RiskApiDlq:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: vanguarda-risk-api-dlq-${sls:stage}
+        MessageRetentionPeriod: 1209600
+        KmsMasterKeyId: !Ref LambdaEnvKey
+
+    # --- Canal de alertas (Blue Team) ---------------------------------------
+    SecurityAlertsTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        TopicName: vanguarda-security-alerts-${sls:stage}
+        KmsMasterKeyId: !Ref LambdaEnvKey
+        Subscription:
+          - Protocol: email
+            Endpoint: ${param:alarmEmail}
+
+    SecurityAlertsTopicPolicy:
+      Type: AWS::SNS::TopicPolicy
+      Properties:
+        Topics:
+          - !Ref SecurityAlertsTopic
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Sid: AllowEventBridgeAndCloudWatch
+              Effect: Allow
+              Principal:
+                Service:
+                  - events.amazonaws.com
+                  - cloudwatch.amazonaws.com
+              Action: sns:Publish
+              Resource: !Ref SecurityAlertsTopic
+
+    # --- Detecção de ameaças: GuardDuty -------------------------------------
+    # Analisa CloudTrail, VPC Flow Logs, DNS e Lambda Network Activity.
+    GuardDutyDetector:
+      Type: AWS::GuardDuty::Detector
+      Properties:
+        Enable: true
+        FindingPublishingFrequency: FIFTEEN_MINUTES
+        Features:
+          - Name: LAMBDA_NETWORK_LOGS
+            Status: ENABLED
+          - Name: RDS_LOGIN_EVENTS
+            Status: ENABLED
+
+    GuardDutyHighSeverityRule:
+      Type: AWS::Events::Rule
+      Properties:
+        Description: Encaminha findings do GuardDuty com severidade >= 7 para o SNS
+        EventPattern:
+          source:
+            - aws.guardduty
+          detail-type:
+            - GuardDuty Finding
+          detail:
+            severity:
+              - numeric: ['>=', 7]
+        Targets:
+          - Arn: !Ref SecurityAlertsTopic
+            Id: SecurityAlertsTopic
+
+    # --- Metric Filter: eventos de segurança emitidos pela aplicação ---------
+    ValidationRejectedMetricFilter:
+      Type: AWS::Logs::MetricFilter
+      DependsOn: RiskApiLogGroup
+      Properties:
+        LogGroupName: /aws/lambda/${self:service}-${sls:stage}-riskApi
+        FilterPattern: '{ ($.event_type = "SECURITY_EVENT") && ($.event = "VALIDATION_REJECTED") }'
+        MetricTransformations:
+          - MetricNamespace: Vanguarda/Security
+            MetricName: ValidationRejected
+            MetricValue: '1'
+            DefaultValue: 0
+
+    RateLimitedMetricFilter:
+      Type: AWS::Logs::MetricFilter
+      DependsOn: RiskApiLogGroup
+      Properties:
+        LogGroupName: /aws/lambda/${self:service}-${sls:stage}-riskApi
+        FilterPattern: '{ ($.event_type = "SECURITY_EVENT") && ($.event = "RATE_LIMITED") }'
+        MetricTransformations:
+          - MetricNamespace: Vanguarda/Security
+            MetricName: RateLimited
+            MetricValue: '1'
+            DefaultValue: 0
+
+    DangerousRiskMetricFilter:
+      Type: AWS::Logs::MetricFilter
+      DependsOn: RiskApiLogGroup
+      Properties:
+        LogGroupName: /aws/lambda/${self:service}-${sls:stage}-riskApi
+        FilterPattern: '{ ($.event_type = "SECURITY_EVENT") && ($.level = "DANGEROUS") }'
+        MetricTransformations:
+          - MetricNamespace: Vanguarda/Business
+            MetricName: ThreatsBlocked
+            MetricValue: '1'
+            DefaultValue: 0
+
+    # --- Alarmes ------------------------------------------------------------
+    # Possível fuzzing/scanner: muitas requisições rejeitadas pela validação.
+    ValidationRejectedAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: vanguarda-${sls:stage}-validation-rejected-spike
+        AlarmDescription: Pico de payloads invalidos (possivel fuzzing ou scanner ativo)
+        Namespace: Vanguarda/Security
+        MetricName: ValidationRejected
+        Statistic: Sum
+        Period: 300
+        EvaluationPeriods: 1
+        Threshold: 100
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+        AlarmActions:
+          - !Ref SecurityAlertsTopic
+
+    RateLimitedAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: vanguarda-${sls:stage}-rate-limited
+        AlarmDescription: Clientes atingindo o rate limit da aplicacao (possivel abuso/bot)
+        Namespace: Vanguarda/Security
+        MetricName: RateLimited
+        Statistic: Sum
+        Period: 300
+        EvaluationPeriods: 1
+        Threshold: 50
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+        AlarmActions:
+          - !Ref SecurityAlertsTopic
+
+    LambdaErrorsAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: vanguarda-${sls:stage}-lambda-errors
+        AlarmDescription: Erros na Lambda do motor de risco
+        Namespace: AWS/Lambda
+        MetricName: Errors
+        Dimensions:
+          - Name: FunctionName
+            Value: ${self:service}-${sls:stage}-riskApi
+        Statistic: Sum
+        Period: 60
+        EvaluationPeriods: 3
+        DatapointsToAlarm: 2
+        Threshold: 5
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+        AlarmActions:
+          - !Ref SecurityAlertsTopic
+
+    ApiLatencyP99Alarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: vanguarda-${sls:stage}-api-latency-p99
+        AlarmDescription: Latencia p99 acima do SLO (800 ms) - experiencia do usuario 60+
+        Namespace: AWS/ApiGateway
+        MetricName: Latency
+        Dimensions:
+          - Name: ApiId
+            Value: !Ref HttpApi
+        ExtendedStatistic: p99
+        Period: 300
+        EvaluationPeriods: 3
+        Threshold: 800
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+        AlarmActions:
+          - !Ref SecurityAlertsTopic
+
+    # Detecção de anomalia (ML nativo do CloudWatch) sobre o volume de requisições:
+    # pega ataques volumétricos e bots sem precisar definir limiar fixo.
+    ApiRequestAnomalyAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: vanguarda-${sls:stage}-api-traffic-anomaly
+        AlarmDescription: Volume de requisicoes fora da banda esperada (anomaly detection)
+        ComparisonOperator: GreaterThanUpperThreshold
+        EvaluationPeriods: 2
+        ThresholdMetricId: band
+        TreatMissingData: notBreaching
+        AlarmActions:
+          - !Ref SecurityAlertsTopic
+        Metrics:
+          - Id: requests
+            ReturnData: true
+            MetricStat:
+              Metric:
+                Namespace: AWS/ApiGateway
+                MetricName: Count
+                Dimensions:
+                  - Name: ApiId
+                    Value: !Ref HttpApi
+              Period: 300
+              Stat: Sum
+          - Id: band
+            Expression: ANOMALY_DETECTION_BAND(requests, 3)
+
+    Api5xxAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: vanguarda-${sls:stage}-api-5xx
+        AlarmDescription: Respostas 5xx no API Gateway
+        Namespace: AWS/ApiGateway
+        MetricName: 5xx
+        Dimensions:
+          - Name: ApiId
+            Value: !Ref HttpApi
+        Statistic: Sum
+        Period: 60
+        EvaluationPeriods: 3
+        DatapointsToAlarm: 2
+        Threshold: 10
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+        AlarmActions:
+          - !Ref SecurityAlertsTopic
+
+  Outputs:
+    ApiBaseUrl:
+      Description: URL base do stage (consumida pelo DAST no pipeline)
+      Value: !Sub https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com

@@ -1,0 +1,80 @@
+# =============================================================================
+# Projeto Vanguarda - CI/CD Mobile (React Native + Expo EAS) · MODO SIMULADO
+# Build nativo na nuvem da Expo (sem Mac/Android Studio no time), OTA updates
+# por canal (hml/production) e envio às lojas com aprovação manual.
+# =============================================================================
+name: Mobile CI/CD (Expo EAS)
+
+on:
+  push:
+    branches: [main, develop]
+    paths: ['apps/mobile/**', '.github/workflows/mobile-eas.yml']
+  pull_request:
+    paths: ['apps/mobile/**']
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Perfil de build EAS
+        type: choice
+        options: [preview, production]
+        default: preview
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: 📱 Lint, testes e validação EAS
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Valida eas.json e app.json
+        run: |
+          node -e 'JSON.parse(require("fs").readFileSync("apps/mobile/eas.json"))' && echo "eas.json válido ✅"
+          node -e 'const a=JSON.parse(require("fs").readFileSync("apps/mobile/app.json")).expo; if(a.android?.usesCleartextTraffic) process.exit(1); console.log("app.json válido, cleartext desabilitado ✅")'
+      - name: Lint + testes (simulado)
+        run: |
+          echo "▶ npm ci && npm run lint && npm run typecheck && npm test -- --coverage"
+          echo "▶ npx expo-doctor"
+
+  eas-build:
+    name: 🏗️ EAS Build (${{ github.ref_name == 'main' && 'production' || 'preview' }})
+    needs: quality
+    runs-on: ubuntu-latest
+    env:
+      PROFILE: ${{ inputs.profile || (github.ref_name == 'main' && 'production' || 'preview') }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Expo/EAS (simulado — real usa expo/expo-github-action@v8 com secrets.EXPO_TOKEN)
+        run: |
+          echo "▶ expo/expo-github-action@v8 (eas-version: latest, token: \${{ secrets.EXPO_TOKEN }})"
+      - name: Build na nuvem da Expo (simulado)
+        run: |
+          echo "▶ eas build --platform all --profile $PROFILE --non-interactive --no-wait"
+          echo "  ✔ Android: $( [ "$PROFILE" = production ] && echo 'AAB (Play Store)' || echo 'APK distribuição interna')"
+          echo "  ✔ iOS: $( [ "$PROFILE" = production ] && echo 'IPA (App Store)' || echo 'Ad-hoc / TestFlight interno')"
+      - name: OTA update para o canal (simulado)
+        run: echo "▶ eas update --channel $( [ "$PROFILE" = production ] && echo production || echo hml ) --message \"${GITHUB_SHA::7}\""
+      - run: |
+          {
+            echo "### 📱 EAS Build"
+            echo "| Item | Valor |"
+            echo "|---|---|"
+            echo "| Perfil | \`$PROFILE\` |"
+            echo "| Canal OTA | $( [ "$PROFILE" = production ] && echo production || echo hml ) |"
+            echo "| Plataformas | Android + iOS (código único) |"
+            echo "| Modo | Simulado |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  eas-submit:
+    name: 🏪 EAS Submit (lojas)
+    needs: eas-build
+    if: github.event_name == 'workflow_dispatch' && inputs.profile == 'production'
+    runs-on: ubuntu-latest
+    environment: production # exige aprovação manual do Tech Lead
+    steps:
+      - run: echo "▶ eas submit --platform all --profile production --latest (simulado)"

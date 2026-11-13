@@ -1,0 +1,44 @@
+#!/usr/bin/env sh
+# =============================================================================
+# Projeto Vanguarda - pre-commit (shift-left: o segredo não pode nem entrar no histórico)
+#  1) git-secrets (padrões AWS + customizados de scripts/setup-git-secrets.sh)
+#     -> fallback: varredura leve por grep se o git-secrets não estiver instalado
+#  2) lint-staged (ESLint + Semgrep + validação YAML apenas nos arquivos staged)
+# A rede de segurança definitiva é o job "🔑 Secret Scanning · TruffleHog" no CI.
+# =============================================================================
+
+if command -v git-secrets >/dev/null 2>&1; then
+  echo "🔑 git-secrets: verificando arquivos staged..."
+  git secrets --pre_commit_hook -- "$@" || {
+    echo ""
+    echo "❌ git-secrets bloqueou o commit: possível segredo nos arquivos staged."
+    echo "   Remova o segredo, ROTACIONE a credencial se ela for real e tente novamente."
+    echo "   Falso positivo? Adicione um padrão permitido: git secrets --add --allowed '<regex>'"
+    exit 1
+  }
+else
+  echo "⚠️  git-secrets NÃO está instalado — usando verificação leve (fallback)."
+  echo "   Instale para proteção completa:"
+  echo "     macOS:  brew install git-secrets"
+  echo "     Linux:  git clone https://github.com/awslabs/git-secrets && cd git-secrets && sudo make install"
+  echo "   Depois registre os padrões do projeto:  npm run secrets:setup  (scripts/setup-git-secrets.sh)"
+  echo ""
+
+  STAGED=$(git diff --cached --name-only --diff-filter=ACMR)
+  if [ -n "$STAGED" ]; then
+    # Somente as linhas ADICIONADAS no diff staged (não o arquivo inteiro).
+    ADDED=$(git diff --cached -U0 --diff-filter=ACMR | grep -E '^\+[^+]' || true)
+    PATTERN='(AKIA|ASIA)[0-9A-Z]{16}|-----BEGIN ([A-Z]+ )?PRIVATE KEY-----|sk_live_[0-9A-Za-z]{16,}|postgres(ql)?://[^:/@ ]+:[^@ ]+@'
+    HITS=$(printf '%s\n' "$ADDED" | grep -E "$PATTERN" | grep -vE 'AKIAIOSFODNN7EXAMPLE|000000000000|<PASSWORD>|\$\{' || true)
+    if [ -n "$HITS" ]; then
+      echo "❌ Possível segredo detectado nas linhas staged:"
+      printf '%s\n' "$HITS" | sed -E 's/((AKIA|ASIA)[0-9A-Z]{4})[0-9A-Z]{12}/\1************/g' | head -20
+      echo ""
+      echo "   Commit bloqueado. Remova o segredo e ROTACIONE a credencial se for real."
+      exit 1
+    fi
+  fi
+fi
+
+echo "🧹 lint-staged: ESLint + Semgrep + YAML nos arquivos staged..."
+npx --no -- lint-staged

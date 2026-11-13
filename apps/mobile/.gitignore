@@ -1,0 +1,33 @@
+# Dependências e caches locais
+node_modules/
+.expo/
+.expo-shared/
+
+# Artefatos de build/export (gerados no CI e no EAS, nunca versionados)
+dist/
+dist-export/
+web-build/
+coverage/
+*.apk
+*.aab
+*.ipa
+
+# Segredos e credenciais de assinatura: ficam no EAS / GitHub Secrets
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+*.p8
+*.p12
+*.mobileprovision
+credentials.json
+google-services-key.json
+
+# Pastas nativas geradas por "expo prebuild" (fluxo CNG: o app.json é a fonte da verdade)
+/android
+/ios
+
+npm-debug.*
+*.log
+.DS_Store

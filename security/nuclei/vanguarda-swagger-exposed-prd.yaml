@@ -1,0 +1,21 @@
+id: vanguarda-swagger-exposed-prd
+
+info:
+  name: Vanguarda - Documentacao OpenAPI exposta em producao
+  author: squad-vanguarda
+  severity: medium
+  description: Em PRD o Swagger deve estar desabilitado (STAGE=prd). Em HML a exposicao e esperada (usada pelo ZAP).
+  tags: vanguarda,exposure,prd-only
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/docs-json"
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: word
+        words:
+          - '"openapi"'
