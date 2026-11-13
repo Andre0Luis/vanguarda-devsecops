@@ -45,3 +45,9 @@ npm install                 # instala Husky (hooks de pre-commit)
 bash scripts/setup-git-secrets.sh
 cd services/api && npm ci && npm test
 ```
+
+## Autoria e processo
+
+- **Definido pelo grupo (Fases 1 a 3 do Tech Challenge):** visão do produto, MVP, arquitetura (DDD, serverless, microsserviços evolutivos), stack (React Native + Expo, NestJS, AWS Lambda/API Gateway, PostgreSQL + Redis), modelo de implementação (trunk-based, ambientes dev/hml/prd, promoção com aprovação) e as regras de segurança (LGPD, ISO 27001/27002, Security by Design).
+- **Implementação acelerada com IA:** seguindo a estratégia registrada na Fase 3 ("Claude Code para lógica complexa, sob supervisão dos devs seniores"), o código e as pipelines foram gerados com **Claude Code a partir das especificações do grupo** e depois **revisados, ajustados e validados pelo time** (testes, scanners e execução real no GitHub Actions).
+- Por isso o histórico do repositório mostra o Claude como coautor: é a própria prática de *AI-assisted development* com revisão humana obrigatória que o plano de DevSecOps define (ver template de PR: "código gerado por IA revisado linha a linha").
