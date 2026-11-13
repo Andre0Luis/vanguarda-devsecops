@@ -35,8 +35,17 @@ flowchart LR
 services/api/       protótipo NestJS + serverless.yml (IaC com Blue Team: CloudWatch, GuardDuty, throttling)
 apps/mobile/        configuração Expo/EAS (app.json, eas.json)
 security/           regras Semgrep customizadas, política ZAP, templates Nuclei
+docs/               threat model, runbooks e playbook de Purple Team
 .husky/             pre-commit (git-secrets + lint-staged) e commit-msg (commitlint)
 ```
+
+## Documentação de segurança
+
+| Documento | Conteúdo |
+|---|---|
+| [docs/threat-model/](docs/threat-model/) | Processo de Threat Modeling + modelo STRIDE da assinatura Premium (pagamentos) |
+| [docs/runbooks/](docs/runbooks/) | Resposta a alarmes do CloudWatch, findings do GuardDuty e vazamento de segredo (RACI, LGPD/ANPD) |
+| [docs/purple-team/retro-playbook.md](docs/purple-team/retro-playbook.md) | Ritual de Purple Team na retrospectiva + registro real da Sprint 1 |
 
 ## Rodando localmente
 
