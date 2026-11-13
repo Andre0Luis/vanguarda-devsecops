@@ -45,7 +45,7 @@ jobs:
       run:
         working-directory: ${{ env.API_DIR }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -86,7 +86,7 @@ jobs:
     container:
       image: semgrep/semgrep
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Semgrep (regras da comunidade + regras customizadas do Vanguarda)
         run: |
           semgrep scan \
@@ -112,7 +112,7 @@ jobs:
     name: 🔑 Secret Scanning · TruffleHog
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # varre o histórico, não só o último commit
       - name: TruffleHog (somente segredos verificados/desconhecidos quebram o build)
@@ -129,7 +129,7 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -160,7 +160,7 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -190,7 +190,7 @@ jobs:
       run:
         working-directory: ${{ env.API_DIR }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -224,7 +224,7 @@ jobs:
       contents: read
       id-token: write # OIDC: sem chaves AWS de longa duração no GitHub
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Autenticação AWS via OIDC (simulado)
         run: |
           echo "▶ aws-actions/configure-aws-credentials@v4"
@@ -259,7 +259,7 @@ jobs:
     needs: deploy-hml
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -304,7 +304,7 @@ jobs:
     needs: deploy-hml
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
