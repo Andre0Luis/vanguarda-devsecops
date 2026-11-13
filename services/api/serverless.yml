@@ -117,7 +117,7 @@ functions:
     description: Vanguarda - motor de risco (links, SMS, Pix)
     reservedConcurrency: ${param:reservedConcurrency} # teto de custo + contenção de abuso
     environment:
-      APP_VERSION: ${env:GITHUB_SHA, 'local'}
+      APP_VERSION: ${env:APP_VERSION, 'local'}
     events:
       - httpApi:
           method: GET

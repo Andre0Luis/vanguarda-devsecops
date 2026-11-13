@@ -19,8 +19,8 @@ jobs:
     name: 🟣 Varredura profunda + métricas
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
@@ -52,7 +52,7 @@ jobs:
             echo ""
             cat reports/purple-zap.md 2>/dev/null || true
           } >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: purple-team-report
           path: reports/

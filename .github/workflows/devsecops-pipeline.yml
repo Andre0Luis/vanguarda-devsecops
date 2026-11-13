@@ -45,8 +45,8 @@ jobs:
       run:
         working-directory: ${{ env.API_DIR }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -67,7 +67,7 @@ jobs:
             console.log(["### 🧪 Cobertura de testes", "| Métrica | % |", "|---|---|",
               row("lines"), row("statements"), row("functions"), row("branches")].join("\n"));
           ' >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: coverage-report
@@ -86,7 +86,7 @@ jobs:
     container:
       image: semgrep/semgrep
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Semgrep (regras da comunidade + regras customizadas do Vanguarda)
         run: |
           semgrep scan \
@@ -102,7 +102,7 @@ jobs:
             --config security/semgrep/vanguarda-rules.yml \
             --severity ERROR --error --metrics=off
           echo "### 🔐 SAST (Semgrep): nenhum achado bloqueante ✅" >> "$GITHUB_STEP_SUMMARY"
-      - uses: github/codeql-action/upload-sarif@v3
+      - uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: semgrep.sarif
@@ -112,7 +112,7 @@ jobs:
     name: 🔑 Secret Scanning · TruffleHog
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # varre o histórico, não só o último commit
       - name: TruffleHog (somente segredos verificados/desconhecidos quebram o build)
@@ -129,13 +129,13 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
       - name: Dependency Review (bloqueia dependência nova com CVE alta ou licença proibida)
         if: github.event_name == 'pull_request'
-        uses: actions/dependency-review-action@v4
+        uses: actions/dependency-review-action@v5
         with:
           fail-on-severity: high
           deny-licenses: GPL-3.0, AGPL-3.0
@@ -160,8 +160,8 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - run: pip install checkov
@@ -171,7 +171,7 @@ jobs:
             --framework serverless github_actions \
             --config-file ${{ env.API_DIR }}/.checkov.yaml \
             --output cli --output sarif --output-file-path console,checkov.sarif
-      - uses: github/codeql-action/upload-sarif@v3
+      - uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: checkov.sarif
@@ -190,8 +190,8 @@ jobs:
       run:
         working-directory: ${{ env.API_DIR }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -203,7 +203,7 @@ jobs:
           echo "▶ npx serverless package --stage hml"
           echo "  → gera .serverless/vanguarda-risk-api.zip + template CloudFormation"
           echo "  (simulado: requer apenas Node; o artefato real é o dist/ abaixo)"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: api-dist
           path: ${{ env.API_DIR }}/dist
@@ -224,7 +224,7 @@ jobs:
       contents: read
       id-token: write # OIDC: sem chaves AWS de longa duração no GitHub
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Autenticação AWS via OIDC (simulado)
         run: |
           echo "▶ aws-actions/configure-aws-credentials@v4"
@@ -259,13 +259,13 @@ jobs:
     needs: deploy-hml
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: ${{ env.API_DIR }}/package-lock.json
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: api-dist
           path: ${{ env.API_DIR }}/dist
@@ -293,7 +293,7 @@ jobs:
         run: |
           echo "### 🕷️ DAST (OWASP ZAP)" >> "$GITHUB_STEP_SUMMARY"
           [ -f reports/zap-report.md ] && cat reports/zap-report.md >> "$GITHUB_STEP_SUMMARY" || true
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: zap-report
@@ -304,13 +304,13 @@ jobs:
     needs: deploy-hml
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: ${{ env.API_DIR }}/package-lock.json
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: api-dist
           path: ${{ env.API_DIR }}/dist
@@ -361,7 +361,7 @@ jobs:
             echo "| SSRF via URL analisada | bloqueado ✅ |"
             echo "| Força bruta na rota de Pix | HTTP 429 ✅ |"
           } >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: nuclei-report
