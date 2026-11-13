@@ -67,7 +67,7 @@ jobs:
             console.log(["### 🧪 Cobertura de testes", "| Métrica | % |", "|---|---|",
               row("lines"), row("statements"), row("functions"), row("branches")].join("\n"));
           ' >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: coverage-report
@@ -203,7 +203,7 @@ jobs:
           echo "▶ npx serverless package --stage hml"
           echo "  → gera .serverless/vanguarda-risk-api.zip + template CloudFormation"
           echo "  (simulado: requer apenas Node; o artefato real é o dist/ abaixo)"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: api-dist
           path: ${{ env.API_DIR }}/dist
@@ -293,7 +293,7 @@ jobs:
         run: |
           echo "### 🕷️ DAST (OWASP ZAP)" >> "$GITHUB_STEP_SUMMARY"
           [ -f reports/zap-report.md ] && cat reports/zap-report.md >> "$GITHUB_STEP_SUMMARY" || true
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: zap-report
@@ -361,7 +361,7 @@ jobs:
             echo "| SSRF via URL analisada | bloqueado ✅ |"
             echo "| Força bruta na rota de Pix | HTTP 429 ✅ |"
           } >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: nuclei-report
