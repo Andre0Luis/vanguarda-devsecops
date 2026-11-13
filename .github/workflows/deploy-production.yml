@@ -30,15 +30,22 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    # Input do usuário entra por variável de ambiente, nunca interpolado direto no
+    # shell (achado do Semgrep: run-shell-injection) + validação de formato semver.
+    env:
+      VERSION: ${{ inputs.version }}
     steps:
-      - uses: actions/checkout@v7
+      - name: Valida formato da versão
+        run: |
+          [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Versão inválida: use vX.Y.Z"; exit 1; }
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Deploy (simulado)
         run: |
           echo "▶ aws-actions/configure-aws-credentials@v4 (OIDC, role vanguarda-github-deployer-prd)"
-          echo "▶ npx serverless deploy --stage prd  (versão ${{ inputs.version }})"
+          echo "▶ npx serverless deploy --stage prd  (versão $VERSION)"
           echo "▶ Lambda alias 'live' com deploy gradual (canary 10% → 100%)"
       - name: Smoke test + rollback automático (simulado)
         run: |
           echo "▶ curl -fsS https://api.vanguarda.app/health"
           echo "  se falhar → npx serverless rollback --stage prd --timestamp <anterior>"
-      - run: echo "### 🚀 Produção atualizada para ${{ inputs.version }} (simulado)" >> "$GITHUB_STEP_SUMMARY"
+      - run: echo "### 🚀 Produção atualizada para $VERSION (simulado)" >> "$GITHUB_STEP_SUMMARY"
